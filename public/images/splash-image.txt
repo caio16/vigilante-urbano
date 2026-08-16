@@ -1,0 +1,3 @@
+Quando você tiver a imagem para a página de abertura, substitua este arquivo de texto por sua imagem.
+Você pode então atualizar a referência no arquivo app/page.tsx para apontar para:
+/images/sua-imagem.jpg (ou .png, .webp, etc.)
