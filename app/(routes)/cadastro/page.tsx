@@ -1,5 +1,6 @@
 "use client"
 
+import { createClient } from '@/lib/supabase/client'
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, UserPlus } from "lucide-react"
 
 export default function CadastroPage() {
+  const supabase = createClient()
   const router = useRouter()
   const { signUp } = useAuth()
 
@@ -21,25 +23,32 @@ export default function CadastroPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 1. Substitua a chamada antiga por esta:
+    const { data, error } = await supabase.auth.signUp({
+      email: email, // sua variável de estado do email
+      password: password, // sua variável de estado da senha
+      options: {
+        data: {
+          nome: nome, // sua variável de estado do nome
+          role: 'user' // Define todo novo usuário como 'user' comum, resolvendo o bug do admin!
+        }
+      }
+    })
 
-    if (password !== confirmPassword) {
-      toast.error("As senhas não coincidem.")
-      return
-    }
-
-    setIsSubmitting(true)
-    const { error } = await signUp({ name, email, password })
-    setIsSubmitting(false)
-
+    // 2. Tratamento de erro ou sucesso
     if (error) {
-      toast.error(error)
+      console.error("Erro ao cadastrar:", error.message)
+      // Aqui você pode disparar um toast de erro para o usuário
       return
     }
 
-    toast.success("Cadastro realizado com sucesso!")
-    router.push("/map")
+    if (data) {
+      console.log("Cadastro realizado com sucesso na nuvem!")
+      // Aqui você redireciona o usuário para o mapa ou para o login
+    }
   }
 
   return (
