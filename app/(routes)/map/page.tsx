@@ -6,8 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import dynamic from 'next/dynamic'
-import { MapPin, Loader2, Trash2, AlertCircle, X, Send } from 'lucide-react'
+import { MapPin, Loader2, Trash2, AlertCircle, X, Send, LogIn } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/lib/auth/auth-context'
+import { toast } from 'sonner'
+import Link from 'next/link'
 
 interface MapPoint {
   id: string
@@ -46,6 +49,7 @@ const categories: Record<string, { label: string; emoji: string; color: string }
 }
 
 export default function MapPage() {
+  const { user } = useAuth()
   const [points, setPoints] = useState<MapPoint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -110,6 +114,11 @@ export default function MapPage() {
   }
 
   const selectAddress = (suggestion: any) => {
+    if (!user) {
+      toast.error("Você precisa entrar para reportar uma ocorrência.")
+      return
+    }
+
     setPreviewPoint({
       lat: parseFloat(suggestion.lat),
       lng: parseFloat(suggestion.lon),
@@ -122,6 +131,11 @@ export default function MapPage() {
   }
 
   const handleMapClick = async (lat: number, lng: number) => {
+    if (!user) {
+      toast.error("Você precisa entrar para reportar uma ocorrência.")
+      return
+    }
+
     setPreviewPoint({ lat, lng })
     
     // Buscar endereço via geocodificação reversa
@@ -139,6 +153,11 @@ export default function MapPage() {
   }
 
   const handleSavePoint = async () => {
+    if (!user) {
+      setError("Você precisa entrar para reportar uma ocorrência.")
+      return
+    }
+
     if (!previewPoint || !formData.title) {
       setError("Preencha o título e selecione um local")
       return
@@ -175,6 +194,11 @@ export default function MapPage() {
   }
 
   const handleDeletePoint = async (id: string) => {
+    if (!user) {
+      toast.error("Você precisa entrar para excluir uma ocorrência.")
+      return
+    }
+
     try {
       setIsDeleting(id)
       const supabase = createClient()
@@ -350,7 +374,20 @@ export default function MapPage() {
               <Card className="bg-gradient-to-b from-blue-900 to-blue-950 border-2 border-blue-500 text-center py-6">
                 <CardContent>
                   <MapPin className="h-8 w-8 text-blue-400 mx-auto mb-2" />
-                  <p className="text-blue-300 text-sm">Clique no mapa ou busque um endereço</p>
+                  {user ? (
+                    <p className="text-blue-300 text-sm">Clique no mapa ou busque um endereço</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-blue-300 text-sm">
+                        Entre com sua conta para reportar uma ocorrência.
+                      </p>
+                      <Link href="/login">
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                          <LogIn className="h-4 w-4 mr-1" /> Entrar
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -443,24 +480,26 @@ export default function MapPage() {
                                   </p>
                                 )}
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeletePoint(point.id)
-                                }}
-                                disabled={isDeleting === point.id}
-                                className={`p-1 rounded-lg transition-all flex-shrink-0 ${
-                                  isSelected
-                                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                                    : 'hover:bg-red-600 text-red-400'
-                                }`}
-                              >
-                                {isDeleting === point.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </button>
+                              {user && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeletePoint(point.id)
+                                  }}
+                                  disabled={isDeleting === point.id}
+                                  className={`p-1 rounded-lg transition-all flex-shrink-0 ${
+                                    isSelected
+                                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                                      : 'hover:bg-red-600 text-red-400'
+                                  }`}
+                                >
+                                  {isDeleting === point.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
