@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -67,6 +67,7 @@ export default function MapPage() {
   })
   const [addressSuggestions, setAddressSuggestions] = useState<any[]>([])
   const [isSearchingAddress, setIsSearchingAddress] = useState(false)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     loadPoints()
@@ -95,22 +96,42 @@ export default function MapPage() {
     }
   }
 
-  const searchAddress = async (query: string) => {
+  const searchAddress = (query: string) => {
+    // Cancela a busca anterior ainda pendente — só a última digitação conta.
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
     if (query.length < 3) {
       setAddressSuggestions([])
+      setIsSearchingAddress(false)
       return
     }
 
     setIsSearchingAddress(true)
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=br`
-      )
-      const data = await response.json()
-      setAddressSuggestions(data)
-    } finally {
-      setIsSearchingAddress(false)
-    }
+
+    // Espera meio segundo depois da última tecla digitada antes de buscar,
+    // evitando disparar uma requisição a cada letra (o que fazia o serviço
+    // de geocodificação bloquear as buscas por excesso de chamadas).
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR`,
+        )
+
+        if (!response.ok) {
+          throw new Error(`Busca de endereço falhou (status ${response.status})`)
+        }
+
+        const data = await response.json()
+        setAddressSuggestions(Array.isArray(data) ? data : [])
+      } catch (err) {
+        console.error("Erro ao buscar endereço:", err)
+        setAddressSuggestions([])
+      } finally {
+        setIsSearchingAddress(false)
+      }
+    }, 500)
   }
 
   const selectAddress = (suggestion: any) => {
@@ -231,9 +252,9 @@ export default function MapPage() {
           <p className="text-blue-300 text-sm mt-1">Plataforma de alertas comunitários para São Paulo</p>
         </div>
 
-        <div className="flex-1 flex gap-4 overflow-hidden p-4">
+        <div className="flex-1 flex flex-col md:flex-row gap-4 overflow-hidden p-4">
           {/* Mapa */}
-          <div className="flex-1 flex flex-col rounded-lg overflow-hidden shadow-2xl border-2 border-blue-500">
+          <div className="h-[45vh] shrink-0 md:h-auto md:shrink md:flex-1 flex flex-col rounded-lg overflow-hidden shadow-2xl border-2 border-blue-500">
             <MapComponentDynamic 
               points={filteredPoints} 
               previewPoint={previewPoint} 
@@ -242,7 +263,7 @@ export default function MapPage() {
           </div>
 
           {/* Painel Lateral */}
-          <div className="w-96 flex flex-col gap-4 overflow-auto">
+          <div className="flex-1 min-h-0 md:flex-none md:w-96 flex flex-col gap-4 overflow-auto">
             {error && (
               <Card className="bg-red-950 border-red-500">
                 <CardContent className="pt-6 flex gap-2">
@@ -310,6 +331,13 @@ export default function MapPage() {
                         ))}
                       </div>
                     )}
+                    {!isSearchingAddress &&
+                      formData.address.length >= 3 &&
+                      addressSuggestions.length === 0 && (
+                        <p className="text-xs text-blue-400">
+                          Nenhum endereço encontrado. Você também pode clicar direto no mapa.
+                        </p>
+                      )}
                   </div>
 
                   {/* Categoria */}
